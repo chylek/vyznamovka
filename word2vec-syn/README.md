@@ -1,4 +1,4 @@
-Download the [SYN V9](https://wiki.korpus.cz/doku.php/cnk:syn:verze9) dataset from https://korpus.cz and use the prepare.py script to convert the dataset format to 1 sentence per line for word2vec.
+For research and education purposes you can download the [SYN V9](https://wiki.korpus.cz/doku.php/cnk:syn:verze9) dataset from https://lindat.cz/repository/xmlui/handle/11234/1-4635 and use the prepare.py script to convert the dataset format to "1 sentence per line" format that word2vec expects.
 The sentences are created from lemmatized forms, some tokens are omitted. See the code.
 
 ```

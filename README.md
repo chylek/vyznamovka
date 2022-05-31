@@ -2,9 +2,7 @@
 
 This is the code + guide that should enable you to create a Semantle clone in Czech language - [Významovka](https://vyznamovka.chylek.eu).
 
-See the `word2vec-syn` directory to learn how to create the word2vec vector binaries. Or you can use the `word2vec-wiki` variant, but I find the game more difficult with its non-lemmatized word forms. 
-
-You can download pretrained word2vec binary from [SYN v9](https://wiki.korpus.cz/doku.php/cnk:syn:verze9) from the *Releases* page in this repository.
+See the `word2vec-syn` directory to learn how to create the word2vec vector binaries from the [SYN v9 dataset](https://korpus.cz). The dataset (and derived work like word2vec vectors) is available only for non-commercial use, see [LINDAT/CLARIN](https://lindat.cz/repository/xmlui/handle/11234/1-4635). Alternatively you can use Wikipedia dump approach in `word2vec-wiki`, but I find the game more difficult with its non-lemmatized word forms. Additional step to lemmatize the words may be needed in that case.
 
 Edit the `server.py` script so the `w2v_path` variable points to the word2vec vector binary. The Tornado server will listen on port 8888. This  also has to be changed in code. I am too lazy to change it to CLI arguments, sorry. 
 
