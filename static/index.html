@@ -1,0 +1,642 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Významovka</title>
+    <style type="text/css">
+        html {
+            --background: white;
+            --text-accent: purple;
+            --text-color: black;
+            color: var(--text-color);
+            background-color: var(--background);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            html {
+                --background: black;
+                --text-color: white;
+                --text-accent: pink;
+            }
+
+        }
+
+        .main {
+            width: 100%;
+            max-width: 40em;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            min-width: 10em;
+            overflow-x: auto;
+            margin: 2em 0;
+        }
+
+        table .last {
+            color: var(--text-accent);
+        }
+
+        table .first {
+            color: var(--text-accent);
+            outline: 1px dashed var(--text-accent);
+
+        }
+
+        thead {
+            font-weight: bold;
+        }
+
+        #guess {
+            border-radius: 4px;
+            border: 1px solid var(--text-color);
+            max-width: 20vw;
+            width: 8em;
+            padding: 0 2em;
+            height: 9ex;
+            margin: 1ex 0;
+        }
+
+        #loader {
+            margin: auto;
+            border: 1ex solid #EAF0F6;
+            border-radius: 50%;
+            border-top: 1ex solid #FF7A59;
+            width: 8ex;
+            height: 8ex;
+            animation: spinner 4s linear infinite;
+        }
+
+        @keyframes spinner {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #input {
+            border-radius: 4px;
+            border: 1px solid var(--text-color);
+            max-width: 80vw;
+            width: 32em;
+            padding: 0 2em;
+            height: 9ex;
+            margin: 1ex 0;
+        }
+
+        #hint {
+            border-radius: 4px;
+            border: 1px solid var(--text-color);
+            height: 9ex;
+        }
+
+        #giveup {
+            border-radius: 4px;
+            border: 1px solid var(--text-color);
+            height: 9ex;
+        }
+
+        #overlay {
+            display: none;
+            padding-top: 1em;
+            padding-bottom: 5em;
+            top: 0;
+            left: 0;
+            position: absolute;
+            width: 100vw;
+            height: 100%;
+            background-color: var(--background);
+        }
+
+        .btnHeader {
+            min-width: 48px;
+        }
+
+        #btnHelp {
+            cursor: pointer;
+        }
+
+        #btnStats {
+            cursor: pointer;
+        }
+
+        #close {
+            cursor: pointer;
+        }
+
+        .header {
+            flex-direction: row;
+            display: flex;
+            margin: 0 1em;
+            font-size: larger;
+        }
+
+        .title {
+            flex-grow: 1;
+            text-align: left;
+        }
+
+        #footer {
+            margin-top: 4ex;
+        }
+
+        .small {
+            font-size: x-small;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script type="text/javascript">
+        let uri = "/api"; // where to find my backend
+        let history = []; // current day's attempt history
+        let best = null; // best guess object so far 
+        let today = new Date();
+        let sortBy = {
+            "elm": "hSim",
+            "col": "sim",
+            "asc": false
+        }; // guess sorting options 
+        let isLoading = false;
+        let loadingTimer = null;
+
+        // indicate loading if true, else stop indicating
+        function loading(val) {
+            if (loadingTimer !== null) {
+                clearTimeout(loadingTimer);
+                loadingTimer = null;
+            }
+            isLoading = val;
+            if (val) {
+                // wait a little before showing the loader
+                loadingTimer = setTimeout(() => {
+                    $("#inputContainer").hide();
+                    $("#loader").show();
+                }, 100);
+            } else {
+                $("#inputContainer").show();
+                $("#loader").hide();
+            }
+
+        }
+
+        // check if new UTC day started
+        function stillToday() {
+            let now = new Date();
+            return today.toISOString().slice(0, 10) == now.toISOString().slice(0, 10)
+        }
+
+        // changes overlay visibility state (visible=true)
+        function overlay(state) {
+            if (state) {
+                $("#game").hide();
+                $("#overlay").show();
+            } else {
+                $("#overlay").hide();
+                $("#game").show();
+            }
+        }
+
+        // shows help overlay if state=true, else hides overlay
+        function help(state) {
+            $("#stats").hide();
+            $("#help").show();
+            overlay(state);
+        }
+
+        // shows previous stats overlay if state=true, else hides overlay
+        function stats(state) {
+            if (state) {
+                $("#stats").show();
+                $("#help").hide();
+                let lst = $("#statsList");
+                lst.empty();
+                let valid = [];
+                // history is stored separately for each date
+                for (let i = 0; i < localStorage.length; i++) {
+                    let key = localStorage.key(i);
+                    let d = Date.parse(key);
+                    if (!isNaN(d)) {
+                        valid.push(key)
+                    }
+                }
+                valid.sort(); // sort by date
+                // create and add table rows
+                for (let i = 0; i < valid.length; i++) {
+                    let key = valid[i];
+                    let d = new Date(key).toLocaleDateString();
+                    let hist = JSON.parse(localStorage.getItem(key));
+                    let l = hist.length;
+                    let hints = 0;
+                    let done = '<td title="nedokončeno">☹️</td>';
+                    for (let j = 0; j < l; j++) {
+                        let itm = hist[j];
+                        if (itm.hinted) {
+                            hints += 1
+                        }
+                        if (itm.pos === 0) {
+                            l = itm.idx + 1; // don't count additional attempts if user continued to guess 
+                            done = itm.gave_up ? '<td title="zobrazeno">🤔</td>' : '<td title="uhodnuto">🥳</td>'
+                        }
+                    }
+                    let row = "<tr><td>" + d + "</td><td>" + l + "</td><td>" + hints + "</td>" + done + "</tr>"
+                    lst.append(row);
+                }
+            }
+            overlay(state);
+        }
+
+        // convert today's date to a string that can be used as localstorage key
+        function todayKey() {
+            return "" + today.toISOString().slice(0, 10);
+        }
+
+        // handle received data string - parse, add to history and show
+        function received(data) {
+            loading(false);
+            let obj = JSON.parse(data);
+            obj.idx = history.length;
+            add(obj);
+            localStorage.setItem(todayKey(), JSON.stringify(history));
+            show();
+        }
+
+        // add guess object to history
+        function add(obj) {
+            history.push(obj);
+            if (best == null || best.sim < obj.sim) {
+                best = obj;
+            }
+        }
+
+        // sorting helper for strings
+        function strcomp(col, asc) {
+            return function (a, b) {
+                if (a[col] === null) {
+                    return asc ? -1 : 1
+                }
+                if (b[col] === null) {
+                    return asc ? 1 : -1;
+                }
+                if (a[col] < b[col]) {
+                    return asc ? -1 : 1;
+                }
+                if (a[col] > b[col]) {
+                    return asc ? 1 : -1;
+                }
+                return 0;
+
+            }
+        }
+
+        // sorting helper for numbers
+        function numcomp(col, asc) {
+            return function (a, b) {
+                if (a[col] === null) {
+                    return asc ? -1 : 1;
+                }
+                if (b[col] === null) {
+                    return asc ? 1 : -1;
+                }
+                return asc ? a[col] - b[col] : b[col] - a[col];
+            }
+        }
+
+        // recreates and shows guess history table
+        function show() {
+            let col = "sim";
+            let asc = false;
+            if (sortBy != null) {
+                col = sortBy.col;
+                asc = sortBy.asc;
+            }
+            // choose correct sorting helper and sort
+            history.sort(col == "word" ? strcomp(col, asc) : numcomp(col, asc));
+            // adds header etc.
+            initTable();
+
+            if (best) {
+                // best result is also the solution
+                if (best.pos === 0) {
+                    addWin(best.gave_up);
+                } else if (best.pos === 1) { // almost the solution. Offer chance to give up.
+                    addGiveUp();
+                }
+            }
+            // renders rows into the table body
+            history.forEach(
+                (obj) => {
+                    addRow($("#history"), obj);
+                }
+            )
+        }
+
+        // preprocess guess from the input and send to backend
+        function guess() {
+            if (isLoading) {
+                return
+            }
+            let val = $("#input").val().toLowerCase();
+            loading(true);
+
+            // let's also check if the word is in the history already
+            let guessed = null;
+            let guessedElm = $("#guessed");
+            guessedElm.hide();
+            if (history != null) {
+                for (let i = 0; i < history.length; i++) {
+                    if (history[i].word == val) {
+                        guessed = history[i];
+                        break;
+                    }
+                }
+            }
+
+            // new word, make request to backend
+            if (guessed === null) {
+                $.get(uri, {
+                    "type": "guess",
+                    "word": val
+                }, received).fail(
+                    () => {
+                        loading(false);
+                    }
+                );
+            } else {
+                // old word
+                // show what we know about the it
+                guessedElm.html("Slovo <b>" + guessed.word + "</b> už bylo " + (guessed.idx + 1) +
+                    ". pokusem. Podobnost byla " + (guessed.sim ? (guessed.sim * 100).toFixed(2) : "neznámá") +
+                    " a pořadí z 1000 bylo " + (guessed.pos > -1 ? guessed.pos : "samá voda") + ".")
+                guessedElm.show();
+                loading(false);
+            }
+            $("#input").val("");
+        }
+
+        // handle keypresses in the input for guesses
+        function guessInput(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                guess();
+            }
+        }
+
+        // requests hint from the backend
+        function hint() {
+            if (isLoading) {
+                return
+            }
+            loading(true);
+            $.get(uri, {
+                "type": "hint",
+                "best": best ? best.word : ""
+            }, (data) => {
+                received(data);
+            }).fail(() => {
+                loading(false);
+            });
+        }
+
+        // table cleanup, adds header with correct sorting highlighted etc.
+        function initTable() {
+            $("#win").remove();
+            $("#giveup").remove();
+            $("#table").empty().append(
+                '<thead id="gameHead"><tr><td id="hTry" data-col="idx">Pokus</td><td id="hWord" data-col="word">Slovo</td><td id="hSim" data-col="sim">Podobnost</td><td id="hPos" data-col="pos">Pořadí z 1000 nejbližších</td></tr></thead><tbody id="history"></tbody>'
+            ).find("td").click(
+                (ev) => changeSorting(ev.target.id, ev.target.getAttribute("data-col"))
+            );
+            if (sortBy) {
+                let td = $("#" + sortBy.elm);
+                td.text(td.text() + (sortBy.asc ? "▲" : "▼"));
+            }
+        }
+
+        // changes table's sorting and refreshes the table
+        function changeSorting(elm, col) {
+            console.log("change sort", elm, col, sortBy);
+            if (sortBy && sortBy.elm == elm) {
+                sortBy.asc = !sortBy.asc;
+            } else {
+                sortBy = {
+                    "col": col,
+                    "asc": true,
+                    "elm": elm
+                };
+            }
+            show();
+        }
+
+        // adds new row from the data object (from backend) to the table
+        function addRow(table, data) {
+            let sim = data.sim !== null ? (data.sim * 100).toFixed(2) : "neznámá";
+            let pos = data.pos < 0 ? "samá voda" : "" + (data.pos + 1) + ".";
+            let isLast = data.idx == history.length - 1;
+            let cls = isLast ? "last" : "regular";
+            // user-requested hint
+            if (data.hinted) {
+                table.append("<tr class='" + cls + "''><td>" + (data.idx + 1) + "</td><td><i title='napovězeno'>" + data
+                    .word + "</i></td><td>" + sim + "</td><td>" + pos + "</td></tr>");
+            } else {
+                table.append("<tr class='" + cls + "''><td>" + (data.idx + 1) + "</td><td>" + data.word + "</td><td>" +
+                    sim + "</td><td>" + pos + "</td></tr>");
+            }
+            // additional row to make it easy to follow last guess's result
+            if (isLast && history.length > 1) {
+                $("#gameHead").prepend("<tr class='first''><td class='small'>poslední</td><td>" + data.word +
+                    "</td><td>" + sim + "</td><td>" + pos + "</td></tr>")
+            }
+        }
+
+        // adds button that requests surrender
+        function addGiveUp() {
+            $("#hint").after('<button type="button" id="giveup">Vzdávám to, chci znát tajenku</button>');
+            $("#giveup").click(giveUp);
+        }
+
+        // announce victory. Was it deserved though?
+        function addWin(gave_up) {
+            if (gave_up) {
+                $("#table").before('<h1 id="win">Znáte tajenku.</h1>')
+            } else {
+                $("#table").before('<h1 id="win">Výborně, uhodli jste tajenku!</h1>');
+            }
+        }
+
+        // user gives up, request the solution from the backend
+        function giveUp() {
+            if (isLoading) {
+                return
+            }
+            if (best && best.pos === 1) { // only when they were almost there
+                loading(true);
+                $.get(uri, {
+                    "type": "giveup",
+                    "best": best ? best.word : ""
+                }, (data) => {
+                    received(data);
+                }).fail(() => {
+                    loading(false);
+                });
+
+            }
+        }
+
+        // checks if it's still the day the page's been loaded
+        // and alter the table accordingly
+        function newDayCheck() {
+            if (!stillToday()) { // new day, new beginning
+                initTable();
+                history.splice(0, history.length);
+                best = null;
+                today = new Date();
+            }
+        }
+
+        function onLoad() {
+            let d = new Date("2022-05-23T00:00Z");
+            let h = d.getHours();
+            let m = d.getMinutes();
+            let txt = "";
+            if (h < 10) txt += "0" + h;
+            else txt += h;
+            if (m < 10) txt += ":0" + m;
+            else txt += ":" + m;
+            $(".localtime").text(txt);
+            $("#loader").hide();
+            if (history.length == 0) { // well this should be true, but let's be sure
+                initTable();
+                let stored = localStorage.getItem(todayKey());
+                if (stored) { // try to recreate from stored guesses
+                    let arr = JSON.parse(stored);
+                    arr.forEach(element => {
+                        add(element);
+                    });
+                    show();
+                }
+            }
+
+        }
+        // we don't want to keep filling the table with yesterday's guesses if the user keeps the page open
+        setInterval(newDayCheck, 1800000);
+        $(window).on("pageshow", newDayCheck);
+
+        // hello
+        $(window).on("load", onLoad);
+    </script>
+</head>
+
+<body>
+    <div class="main" id="game">
+        <div class="header">
+            <div class="title">Významovka</div>
+            <div class="btnHeader" id="btnStats" onclick="stats(true)">📶</div>
+            <div class="btnHeader" id="btnHelp" onclick="help(true)">❔</div>
+        </div>
+
+        <div id="loader">
+
+        </div>
+        <div id="inputContainer">
+            <input type="text" autocapitalize="false" id="input" placeholder="Napište tipované slovo"
+                onkeyup="guessInput(event)" />
+            <button type="button" id="guess" onclick="guess()">Hádat</button>
+        </div>
+        <div id="guessed"></div>
+        <table id="table">
+
+        </table>
+        <div>
+            <button type="button" id="hint" onclick="hint()">Potřebuji napovědět bližší slovo</button>
+        </div>
+        <div id="faq">
+            <h2>Stručná nápověda</h2>
+            <p>Hádejte tajenku. Tajenkou je&nbsp;vždy jedno slovo <a
+                    href="https://cs.wikipedia.org/wiki/Lemma_(lingvistika)">v&nbsp;základním tvaru</a> (libovolný
+                slovní druh). Hra Vám pro&nbsp;každý Váš tip poví, jak se&nbsp;významem blíží hledanému slovu. Nehledáte
+                tedy slovo, které&nbsp;se&nbsp;podobně píše nebo je&nbsp;přesmyčkou. Hledáte slovo podle podobnosti
+                významu.</p>
+            <p>Jak poznáte, že&nbsp;se&nbsp;blížíte tajence? Částečně ze&nbsp;sloupce <i>podobnost</i>. Podobnost může
+                mít hodnotu od -100 do 100. Čím vyšší je podobnost, tím více se významem váš tip blíží tajence. Z tohoto
+                čísla ovšem nejde poznat, kolik slov je významem blíže (slovo s podobností 69 může být někdy to
+                nejbližší, jindy klidně 500. nejbližší). Proto je v tabulce i sloupec <i>Pořadí z 1000 nejbližších</i>.
+                Ten Vám řekne, kolikáté slovo z 1000 nejbližších je Váš tip. </p>
+            <p>Pokud je <i>podobnost</i> „neznámá“, pak jsme Váš tip nenalezli ve slovníku, z kterého hra vychází. Možná
+                jste nepoužili základní tvar slova. Může se také jednat o naši chybu nebo o Váš překlep. Každopádně k
+                tajence Vás to nepřiblíží a musíte zkusit slovo jiné.</p>
+            <p>Tajenka ani blízká slova nejsou redigovány. Pokud se bojíte, že by některé z českých slov mohlo
+                poznamenat Váš duševní stav či vývoj, hru raději nehrajte.</p>
+            <p>Nezapomeňte, že jde pouze o matematický model, který nemusí podobnost odhadnout správně. Pokud se Vám
+                zdá, že se tajenka významem občas nepodobá žádnému z Vašich blízkých tipů, budete mít nejspíš pravdu.
+            </p>
+            <p>Tajenka se mění jednou denně, o půlnoci greenwichského času (00:00 GMT, <span class="localtime"></span> v
+                časové zóně Vašeho počítače).</p>
+        </div>
+        <div id="footer">Původní anglická verze hry od Davida Turnera je <a href="https://semantle.com">Semantle</a>.
+            K vytvoření word2vec modelu byla použita data <a href="https://lindat.cz/repository/xmlui/handle/11234/1-4635">SYN v9</a> pod licencí <a href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">CNC</a> a srovnávací seznamy <a href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">SYN2015</a> pod licencí <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+            Tvůrcem české verze je <a href="https://adam.chylek.eu">Adam Chýlek</a>.
+        </div>
+    </div>
+    <div id="overlay">
+        <div id="help" class="main">
+            <div class="header">
+                <div class="title">Najděte tajenku podle slov s podobným významem</div>
+                <div id="close" onclick="help(false)">❌</div>
+            </div>
+            <div>
+                <p>Hádáte tajenku postupně slovo po slově. Hra vám poví, jak se váš tip významově blíží hledanému slovu.
+                    Nehledáte tedy slovo, které se podobně píše nebo používá stejná písmena. Podobným významem se myslí
+                    to, že se objevuje v různých textech v podobném kontextu. Nejde tedy ani o synonyma, antonyma apod.
+                </p>
+                <p>Tajenkou je vždy náhodně vybrané slovo v základní tvaru, tzv. <a
+                        href="https://cs.wikipedia.org/wiki/Lemma_(lingvistika)">lemma</a>. Nelekejte se toho výrazu,
+                    znamená to jen, že např. podstatná jména jsou vždy v prvním pádě, jednotném čísla (nehledejte tedy
+                    <i>tety</i>, ale <i>teta</i>), přídavná jména navíc jen v mužském rodě, slovesa jsou vždy v
+                    inifinitivu (<i>dělat</i>, nikoliv <i>dělají</i>), příslovce v 1. stupni (<i>dobrý</i>, nikoliv
+                    <i>lepší</i> ani <i>nejlepší</i>) atd. Vlastní jména (Praha, Kamila) nejsou mezi hledanými slovy.
+                </p>
+                <p>Sloupec <i>podobnost</i> může mít hodnotu od -100 do 100. Čím vyšší číslo, tím více se význam vašeho
+                    tipu blíží tajence. Z tohoto čísla nejde poznat, kolik slov je významově bližších (slovo s
+                    podobností 69 může být někdy to nejbližší, jindy klidně 500. nejbližší). Proto je v tabulce i
+                    sloupec <i>Pořadí z 1000 nejbližších</i> - ten vám řekne, kolikáté slovo z 1000 nejbližších je váš
+                    tip.</p>
+                <p>Podobnost významu hra odhaduje pomocí matematického modelu <a
+                        href="https://cs.wikipedia.org/wiki/Vno%C5%99en%C3%AD_slov#Word2vec">word2vec</a> z databáze
+                    226817 lemmat. Je tedy možné, že slovo, které znáte, v modelu vůbec nenajdeme. Také je možné, že se
+                    model občas splete a jako blízké označí slovo, které význam podobný nemá.</p>
+                <p>Pokud si nevíte rady, klidně použijte nápovědu. Získáte tak jedno ze slov, které jsou tajence
+                    významově blíže, než váš nejlepší tip. Nápověda vám ale nikdy neukáže tajenku, vždy končí jen na
+                    významově nejbližším slově. Oproti jiné populární hře se slovy (kde máte maximálně 6 pokusů na
+                    uhodnutí tajenky) vás v této hře čeká pár tuctů pokusů, než tajenku uhodnete.</p>
+                <p>Tajenka se mění jednou denně, o půlnoci greenwichského času (00:00 GMT, <span
+                        class="localtime"></span> v časové zóně Vašeho počítače).</p>
+            </div>
+        </div>
+        <div id="stats" class="main">
+            <div class="header">
+                <div class="title">Statistiky</div>
+                <div id="close" onclick="stats(false)">❌</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <td>Datum</td>
+                        <td>Pokusů</td>
+                        <td>Nápověd</td>
+                        <td>Uhodnuto?</td>
+                    </tr>
+                </thead>
+                <tbody id="statsList"></tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>
