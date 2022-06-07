@@ -61,8 +61,11 @@ def hint(best):
         i = top.index(best)
     except ValueError:
         return top[-1], len(top)-1
-    if i>1:
+    if i>10:
         j = i//2
+        return top[j], j
+    elif i>1:
+        j = i-1
         return top[j], j
     else:
         return best, i
