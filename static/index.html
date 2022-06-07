@@ -344,15 +344,8 @@
             )
         }
 
-        // preprocess guess from the input and send to backend
-        function guess() {
-            if (isLoading) {
-                return
-            }
-            let val = $("#input").val().toLowerCase();
-            loading(true);
-
-            // let's also check if the word is in the history already
+        function inHistory(val) {
+            // let's check if the word is in the history already
             let guessed = null;
             let guessedElm = $("#guessed");
             guessedElm.hide();
@@ -364,9 +357,32 @@
                     }
                 }
             }
+            if (guessed === null) {
+                return false;
+            }
+            else {
+                // old word
+                // show what we know about the it
+                guessedElm.html("Slovo <b>" + guessed.word + "</b> už bylo " + (guessed.idx + 1) +
+                    ". pokusem. Podobnost byla " + (guessed.sim ? (guessed.sim * 100).toFixed(2) : "neznámá") +
+                    " a pořadí z 1000 bylo " + (guessed.pos > -1 ? (guessed.pos + 1) : "samá voda") + ".")
+                guessedElm.show();
+                loading(false);
+                return true;
+            }
+        }
+
+        // preprocess guess from the input and send to backend
+        function guess() {
+            if (isLoading) {
+                return
+            }
+            let val = $("#input").val().toLowerCase();
+            loading(true);
+
 
             // new word, make request to backend
-            if (guessed === null) {
+            if (!inHistory(val)) {
                 $.get(uri, {
                     "type": "guess",
                     "word": val
@@ -375,14 +391,6 @@
                         loading(false);
                     }
                 );
-            } else {
-                // old word
-                // show what we know about the it
-                guessedElm.html("Slovo <b>" + guessed.word + "</b> už bylo " + (guessed.idx + 1) +
-                    ". pokusem. Podobnost byla " + (guessed.sim ? (guessed.sim * 100).toFixed(2) : "neznámá") +
-                    " a pořadí z 1000 bylo " + (guessed.pos > -1 ? guessed.pos : "samá voda") + ".")
-                guessedElm.show();
-                loading(false);
             }
             $("#input").val("");
         }
@@ -399,6 +407,10 @@
         function hint() {
             if (isLoading) {
                 return
+            }
+            if (best != null && best.pos === 1) {
+                inHistory(best.word);
+                return;
             }
             loading(true);
             $.get(uri, {
