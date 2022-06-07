@@ -51,11 +51,15 @@
         thead {
             font-weight: bold;
         }
-
+        #inputContainer {
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
         #guess {
             border-radius: 4px;
             border: 1px solid var(--text-color);
-            max-width: 20vw;
             width: 8em;
             padding: 0 2em;
             height: 9ex;
@@ -69,6 +73,7 @@
             border-top: 1ex solid #FF7A59;
             width: 8ex;
             height: 8ex;
+            display: inline-block;
             animation: spinner 4s linear infinite;
         }
 
@@ -117,7 +122,9 @@
         }
 
         .btnHeader {
-            min-width: 48px;
+            min-width: 3ex;
+            min-height: 3ex;
+            margin: 0 1ex;
         }
 
         #btnHelp {
@@ -176,11 +183,11 @@
             if (val) {
                 // wait a little before showing the loader
                 loadingTimer = setTimeout(() => {
-                    $("#inputContainer").hide();
+                    $("#guess").hide();
                     $("#loader").show();
-                }, 100);
+                }, 200);
             } else {
-                $("#inputContainer").show();
+                $("#guess").show();
                 $("#loader").hide();
             }
 
@@ -537,17 +544,17 @@
     <div class="main" id="game">
         <div class="header">
             <div class="title">Významovka</div>
-            <div class="btnHeader" id="btnStats" onclick="stats(true)">📶</div>
-            <div class="btnHeader" id="btnHelp" onclick="help(true)">❔</div>
+            <div class="btnHeader" id="btnStats" title="Statistiky" onclick="stats(true)">📶</div>
+            <div class="btnHeader" id="btnHelp" title="Nápověda" onclick="help(true)">❔</div>
         </div>
 
-        <div id="loader">
-
-        </div>
         <div id="inputContainer">
             <input type="text" autocapitalize="false" id="input" placeholder="Napište tipované slovo"
                 onkeyup="guessInput(event)" />
             <button type="button" id="guess" onclick="guess()">Hádat</button>
+            <div id="loader">
+
+            </div>
         </div>
         <div id="guessed"></div>
         <table id="table">
@@ -580,7 +587,12 @@
                 časové zóně Vašeho počítače).</p>
         </div>
         <div id="footer">Původní anglická verze hry od Davida Turnera je <a href="https://semantle.com">Semantle</a>.
-            K vytvoření word2vec modelu byla použita data <a href="https://lindat.cz/repository/xmlui/handle/11234/1-4635">SYN v9</a> pod licencí <a href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">CNC</a> a srovnávací seznamy <a href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">SYN2015</a> pod licencí <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+            K vytvoření word2vec modelu byla použita data <a
+                href="https://lindat.cz/repository/xmlui/handle/11234/1-4635">SYN v9</a> pod licencí <a
+                href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">CNC</a> a
+            srovnávací seznamy <a
+                href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">SYN2015</a> pod
+            licencí <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
             Tvůrcem české verze je <a href="https://adam.chylek.eu">Adam Chýlek</a>.
         </div>
     </div>
