@@ -4,7 +4,6 @@ import tornado.ioloop
 import tornado.web
 import datetime
 import json
-from threading import Lock
 
 w2v_path = "cs_syn_vectors.bin"
 kv = gensim.models.KeyedVectors.load_word2vec_format(w2v_path, binary=True)
@@ -17,29 +16,28 @@ startdate = datetime.date(2022, 5, 23)
 def init():
     global today
     global secret
-    with initlock:
-        day = datetime.datetime.utcnow().date()
-        del top[:]
-        secret = None
-        if today!=day:
-            today=day
-        else:
-            return
-        idx = (day-startdate).days
-        try:
-            secret = secrets[idx]
-        except IndexError:
-            print("index error, konec")
-            secret = "konec"
-        lst = kv.similar_by_word(secret, topn=3000)
-        cnt = 0
-        top.append(secret)
-        for w, sim in lst:
-            if cnt == 999:
-                break
-            if w.islower():
-                top.append(w)
-                cnt+=1
+    day = datetime.datetime.utcnow().date()
+    if today!=day:
+        today=day
+    else:
+        return
+    del top[:]
+    secret = None
+    idx = (day-startdate).days
+    try:
+        secret = secrets[idx]
+    except IndexError:
+        print("index error, konec")
+        secret = "konec"
+    lst = kv.similar_by_word(secret, topn=3000)
+    cnt = 0
+    top.append(secret)
+    for w, sim in lst:
+        if cnt == 999:
+            break
+        if w.islower():
+            top.append(w)
+            cnt+=1
 
 
 def check_day():
@@ -128,7 +126,7 @@ class MainHandler(tornado.web.RequestHandler):
             }
             self.write(json.dumps(res))
         else:
-            self.write("K vytvoření modelu byla použita data SYN v9 a srovnávací seznamy SYN2015 z korpus.cz pod licencí CC BY 4.0.")
+            self.write("Hello world.")
 
 class MyStaticFileHandler(tornado.web.StaticFileHandler):
     def set_extra_headers(self, path):
