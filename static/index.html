@@ -4,7 +4,16 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="google-site-verification" content="BBH3sJ6xGiBiINlFTePw5RM4GdECOGP8yRA91gwrod4" />
 
+    <link rel="icon" type="image/png" href="icon.png">
+    <meta name="theme-color" content="#000">
+    <link rel="apple-touch-icon" sizes="256x256" href="icon.png">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="msapplication-TileColor" content="#2b5797">
+    <meta name="msapplication-config" content="browserconfig.xml">
     <title>Významovka</title>
     <style type="text/css">
         html {
@@ -235,7 +244,7 @@
                 }
                 valid.sort(); // sort by date
                 // create and add table rows
-                for (let i = 0; i < valid.length; i++) {
+                for (let i = valid.length-1; i >= 0; i--) {
                     let key = valid[i];
                     let d = new Date(key).toLocaleDateString();
                     let hist = JSON.parse(localStorage.getItem(key));
@@ -582,7 +591,10 @@
                 slovní druh). Hra Vám pro&nbsp;každý Váš tip poví, jak se&nbsp;významem blíží hledanému slovu. Nehledáte
                 tedy slovo, které&nbsp;se&nbsp;podobně píše nebo je&nbsp;přesmyčkou. Hledáte slovo podle podobnosti
                 významu.</p>
-            <p>Jak poznáte, že&nbsp;se&nbsp;blížíte tajence? Částečně ze&nbsp;sloupce <i>podobnost</i>. Podobnost může
+            <p>
+                Např. pro tajenku „milovat“ byla nejbližší slova zbožňovat, nenávidět, milovaný, láska, zamilovat, milující a žárlit.
+            </p>
+            <p>Jak tedy poznáte, že&nbsp;se&nbsp;blížíte tajence? Částečně ze&nbsp;sloupce <i>podobnost</i>. Podobnost může
                 mít hodnotu od -100 do 100. Čím vyšší je podobnost, tím více se významem váš tip blíží tajence. Z tohoto
                 čísla ovšem nejde poznat, kolik slov je významem blíže (slovo s podobností 69 může být někdy to
                 nejbližší, jindy klidně 500. nejbližší). Proto je v tabulce i sloupec <i>Pořadí z 1000 nejbližších</i>.
@@ -590,6 +602,7 @@
             <p>Pokud je <i>podobnost</i> „neznámá“, pak jsme Váš tip nenalezli ve slovníku, z kterého hra vychází. Možná
                 jste nepoužili základní tvar slova. Může se také jednat o naši chybu nebo o Váš překlep. Každopádně k
                 tajence Vás to nepřiblíží a musíte zkusit slovo jiné.</p>
+            
             <p>Tajenka ani blízká slova nejsou redigovány. Pokud se bojíte, že by některé z českých slov mohlo
                 poznamenat Váš duševní stav či vývoj, hru raději nehrajte.</p>
             <p>Nezapomeňte, že jde pouze o matematický model, který nemusí podobnost odhadnout správně. Pokud se Vám
@@ -605,6 +618,7 @@
             srovnávací seznamy <a
                 href="https://lindat.mff.cuni.cz/repository/xmlui/page/license-cnc?locale-attribute=en">SYN2015</a> pod
             licencí <a href="http://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+            Logo vygenerováno modelem <a href="https://huggingface.co/spaces/dalle-mini/dalle-mini">🤗 DALL·E mini</a>.
             Tvůrcem české verze je <a href="https://adam.chylek.eu">Adam Chýlek</a>.
         </div>
     </div>
