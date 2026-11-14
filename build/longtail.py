@@ -4,9 +4,10 @@ Streams the full cc.cs.300 (data/cc.cs.300.vec.gz), lemmatises each lowercase Cz
   {"m": {form: lemma}, "v": {lemma: base64 int8[128]}}
 "m" holds every form whose lemma differs from itself (core or not); "v" holds a PCA-128
 int8 vector for each non-core lemma (fastText row < MAX_ROW). Also writes data/pca.npz
-(mean + basis fitted on the core vectors), which days.py uses for the per-day cosines,
+(POS centroids + mean + basis fitted on the POS-debiased core vectors), which days.py uses for the per-day cosines,
 so core and long-tail words are compared in the same space."""
-import base64, gzip, json, os, re, shutil, collections, numpy as np, simplemma
+import base64, gzip, json, os, re, shutil, sys, collections, numpy as np, simplemma
+sys.path.insert(0, "build"); from pos import pos, centroids, debias
 
 MAX_ROW, DIM = 1_000_000, 128
 ok = re.compile(r"^[a-záčďéěíňóřšťúůýž]{2,}$")
@@ -15,9 +16,11 @@ core_set = set(core)
 forms = json.load(open("data/forms.json"))
 
 ft = np.load("data/ft.npy").astype(np.float32)
-mu = ft.mean(0)
-P = np.linalg.svd(ft - mu, full_matrices=False)[2][:DIM]
-np.savez("data/pca.npz", mu=mu, P=P)
+p_core, cent = centroids(core, ft)  # part-of-speech means, see pos.py
+ftd = debias(ft, p_core, cent)
+mu = ftd.mean(0)
+P = np.linalg.svd(ftd - mu, full_matrices=False)[2][:DIM]
+np.savez("data/pca.npz", mu=mu, P=P, cent=cent)
 
 vec, row = {}, {}
 with gzip.open("data/cc.cs.300.vec.gz", "rt", encoding="utf8", errors="ignore") as f:
@@ -58,8 +61,10 @@ for w in row:
         need.add(l)
 for f_, l in forms.items():  # core forms not in fastText (wordfreq-only) too
     shards[f_[:3]]["m"].setdefault(f_, l)
+known = core_set | need
 for l in need:
-    z = (vec[l] / np.linalg.norm(vec[l]) - mu) @ P.T
+    v = debias((vec[l] / np.linalg.norm(vec[l]))[None], np.array([pos(l, known)]), cent)[0]
+    z = (v - mu) @ P.T
     q = np.clip(np.round(z / np.abs(z).max() * 127), -127, 127).astype(np.int8)
     shards[l[:3]]["v"][l] = base64.b64encode(q.tobytes()).decode()
 shutil.rmtree("docs/w", ignore_errors=True); os.makedirs("docs/w")

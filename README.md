@@ -25,6 +25,10 @@ a raw cosine score.
   secrets, hints or in the nearest-words list.
 - **Base similarity** – [fastText cc.cs.300](https://fasttext.cc/docs/en/crawl-vectors.html)
   (Common Crawl + Wikipedia, CC BY-SA 3.0) cosine. Ranks every word.
+- **Part-of-speech debiasing** – fastText neighbours cluster by part of speech (for
+  `technický` the noun `technika` was #3487). `build/pos.py` guesses the POS from the
+  ending and subtracts each POS's mean vector before any comparison (core, long tail,
+  Jev pool): `technika` is now #2, `technologie` #8.
 - **Top 1000** – the 1000 nearest fastText words are re-ranked by a blend of
   60 % *“is this closely related in meaning to the secret?”* probability from
   [Jev](https://typesafe.ai) and 40 % fastText rank. That fixes the classic word2vec
@@ -50,7 +54,7 @@ curl -sL https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.vec.gz 
 curl -sL https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.bin.gz | gunzip > data/cc.cs.300.bin
 for f in cs_CZ.dic cs_CZ.aff; do curl -sL https://raw.githubusercontent.com/LibreOffice/dictionaries/master/cs_CZ/$f -o data/$f; done
 .venv-ft/bin/python build/subword.py     # see its docstring for the Python 3.11 venv
-.venv/bin/python build/longtail.py       # docs/w/*.json + data/pca.npz (run before days.py)
+.venv/bin/python build/longtail.py       # docs/w/*.json + data/pca.npz incl. POS centroids (before days.py)
 .venv/bin/python build/days.py
 cp data/words.txt docs/
 ```

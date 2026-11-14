@@ -2609,6 +2609,7 @@ květ
 hloubka
 kmen
 volně
+zdraví
 výtvarný
 vrtulník
 jednotný
@@ -6166,6 +6167,7 @@ vyléčit
 akcionář
 padesátý
 knihkupectví
+zábavní
 promítnout
 repertoár
 charakterizovat
@@ -7627,6 +7629,7 @@ neříct
 totalitní
 přebírat
 stanovovat
+zranění
 čistit
 kvantový
 šunka
@@ -21476,6 +21479,7 @@ vnímavost
 voleje
 vyhřívaný
 vystřihnout
+vytištění
 vyvraždit
 vyřezávání
 výňatek
@@ -22575,11 +22579,13 @@ meziresortní
 moped
 mrzačení
 mužnost
+najatí
 napínat
 nebytí
 nejobávanější
 nejsnadněji
 nemajetkové
+nemrtví
 nepočítaně
 nezmínit
 odbahnění
@@ -22740,6 +22746,7 @@ obhájení
 odemčení
 odsunutí
 odvětí
+ohnutí
 okatě
 opulentní
 ornamentální
@@ -23363,6 +23370,7 @@ nocovat
 odhození
 odtažení
 omilostnění
+opoždění
 oregano
 paprička
 paragon
@@ -25599,6 +25607,7 @@ outdoorový
 realističnost
 pórobeton
 autoopravna
+obilní
 nenucený
 popraskaný
 gramotný
@@ -26743,6 +26752,7 @@ neodůvodněné
 nerozpustné
 nevyšší
 nitroglycerin
+náctiletí
 nástřel
 nástřik
 obrobek
@@ -27248,6 +27258,7 @@ pohrobek
 polévání
 pomočování
 popít
+potulní
 poukázání
 pověšený
 poštolka
@@ -28249,6 +28260,7 @@ počeštění
 pořezání
 pravobřežní
 průzračnost
+puštění
 pásovec
 pískování
 předčíslí
@@ -29890,6 +29902,7 @@ nekoncepční
 neoklasicistní
 nespočtem
 obchůzka
+ochrnutí
 odchycení
 odladěný
 odpudivě
@@ -30705,6 +30718,7 @@ novelizované
 nýt
 obdarovávání
 objektový
+odladění
 odlití
 odprostit
 odsazení
@@ -31661,6 +31675,7 @@ namrzání
 naroubovat
 narovnávání
 nasoukat
+nedocenění
 nejobdivovanější
 nekompatibilita
 nenapsat

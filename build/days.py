@@ -1,7 +1,8 @@
 """Per-day puzzle files for the static site.
-Ranking = fastText cosine for everything, but the 1000 nearest words get re-ranked
-by a blend of Jev's 'closely related in meaning?' probability and their fastText rank,
-so the warm end of the list follows human association, not just co-occurrence.
+Ranking = cosine of POS-debiased fastText vectors (pos.py: without it an adjective secret
+only finds adjectives) for everything. The pool of the 1000 debiased-nearest plus the 300
+raw-nearest words is re-ranked by a blend of Jev's 'closely related in meaning?'
+probability and the debiased rank, so the warm end follows human association.
 
 docs/d/<n>.bin  (n = 1-based day number since START):
   uint16[1001]  word indices: secret, then ranks 1..1000
@@ -10,14 +11,16 @@ docs/d/<n>.bin  (n = 1-based day number since START):
   int8[128]     the secret's PCA vector, so the browser can score long-tail guesses
 Jev answers are cached in data/jev/<secret>.json, so re-runs only ask about new words."""
 import json, os, sys, numpy as np
-sys.path.insert(0, "build"); from jev import noul
+sys.path.insert(0, "build"); from jev import noul; from pos import pos, debias
 
-POOL, TOP, W_JEV = 1000, 1000, 0.6
+POOL, RAW, TOP, W_JEV = 1000, 300, 1000, 0.6
 words = open("data/words.txt").read().split()
 ix = {w: i for i, w in enumerate(words)}
 e = np.load("data/ft.npy").astype(np.float32)
 pca = np.load("data/pca.npz")  # from longtail.py
-z = (e - pca["mu"]) @ pca["P"].T
+known = set(words)
+ed = debias(e, np.array([pos(w, known) for w in words]), pca["cent"])
+z = (ed - pca["mu"]) @ pca["P"].T
 zq = np.clip(np.round(z / np.abs(z).max(1, keepdims=True) * 127), -127, 127)  # same int8 as the shards
 zn = zq / np.linalg.norm(zq, axis=1, keepdims=True)
 secrets = open("data/secrets.txt").read().split()
@@ -26,9 +29,11 @@ os.makedirs("docs/d", exist_ok=True); os.makedirs("data/jev", exist_ok=True)
 
 
 def rank(sec):
-    s = e @ e[ix[sec]]
-    s[ix[sec]] = -9
-    pool = np.argsort(-s)[:POOL]
+    s, raw = ed @ ed[ix[sec]], e @ e[ix[sec]]
+    s[ix[sec]] = raw[ix[sec]] = -9
+    order = np.argsort(-s)
+    dr = np.empty(len(words), int); dr[order] = np.arange(len(words))  # debiased rank of every word
+    pool = np.array(list(dict.fromkeys([*order[:POOL], *np.argsort(-raw)[:RAW]])))
     cache = f"data/jev/{sec}.json"
     p = json.load(open(cache)) if os.path.exists(cache) else {}
     todo = [words[i] for i in pool if words[i] not in p]  # only words not asked before (vocab changes)
@@ -36,7 +41,7 @@ def rank(sec):
         p.update(zip(todo, noul({"language": "Czech", "secret_word": sec},
                                 [f"Is „{w}“ closely related in meaning to the secret word?" for w in todo])))
         json.dump(p, open(cache, "w"), ensure_ascii=False)
-    blend = [W_JEV * p[words[i]] + (1 - W_JEV) * (1 - r / POOL) for r, i in enumerate(pool)]
+    blend = [W_JEV * p[words[i]] + (1 - W_JEV) * max(0, 1 - dr[i] / POOL) for i in pool]
     top = pool[np.argsort(blend, kind="stable")[::-1]][:TOP]
     return s, top
 

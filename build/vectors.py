@@ -29,7 +29,7 @@ for i, x in enumerate(cand):
                 for b in BASE:
                     h = st + b
                     if h != x and rank.get(h, i) < i and ft[h] @ ft[x] > 0.55:
-                        if h.endswith("ý") and x[-1] in "ěey":  # adverb from adjective, keep
+                        if h.endswith("ý") and x[-1] in "ěeyí":  # adverb from adjective, or -í noun (zdraví), keep
                             continue
                         base = h
                         break
