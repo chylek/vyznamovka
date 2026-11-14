@@ -15,6 +15,14 @@ a raw cosine score.
   of real look-alikes like `byt/být`, `hřát/hrát`) and inflected / `ne-` forms Jev
   flags (`vyzní`, `nezazní`) into their headword. ~32k guessable words; ~83k other
   forms map to them, so typing `psa`, `clovek` or `nezazní` still works.
+- **Long tail** – every other word is guessable too: all ~710k lowercase Czech tokens of
+  fastText (top 1M rows get their own vector) plus every headword of the LibreOffice
+  hunspell `cs_CZ` dictionary (GPL; vectors from fastText's subword model, so words Common
+  Crawl never saw still get one). ~307k extra lemmas as int8 PCA-128 vectors and ~224k
+  form→lemma pairs, in `docs/w/<first 3 letters>.json` shards (median under 1 kB, largest 1.4 MB),
+  fetched only when such a word is typed. The browser scores it against the day's
+  secret vector and ranks it among the core words. Long-tail words never appear as
+  secrets, hints or in the nearest-words list.
 - **Base similarity** – [fastText cc.cs.300](https://fasttext.cc/docs/en/crawl-vectors.html)
   (Common Crawl + Wikipedia, CC BY-SA 3.0) cosine. Ranks every word.
 - **Top 1000** – the 1000 nearest fastText words are re-ranked by a blend of
@@ -38,8 +46,13 @@ curl -sL https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.vec.gz 
 .venv/bin/python build/vectors.py        # data/words.txt, data/ft.npy
 .venv/bin/python build/dedupe.py         # fold typos + inflected forms into forms.json (Jev, cached)
 # build/pick_secrets.py only once: data/secrets.txt is committed and is the schedule
-.venv/bin/python build/days.py           # docs/d/*.bin (Jev answers cached in data/jev/)
-cp data/words.txt data/forms.json docs/
+curl -sL https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.vec.gz -o data/cc.cs.300.vec.gz
+curl -sL https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.cs.300.bin.gz | gunzip > data/cc.cs.300.bin
+for f in cs_CZ.dic cs_CZ.aff; do curl -sL https://raw.githubusercontent.com/LibreOffice/dictionaries/master/cs_CZ/$f -o data/$f; done
+.venv-ft/bin/python build/subword.py     # see its docstring for the Python 3.11 venv
+.venv/bin/python build/longtail.py       # docs/w/*.json + data/pca.npz (run before days.py)
+.venv/bin/python build/days.py
+cp data/words.txt docs/
 ```
 
 Jev needs `JEV_API_KEY` in the environment. Changing `data/words.txt` changes word

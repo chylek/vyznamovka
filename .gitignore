@@ -132,3 +132,4 @@ dmypy.json
 data/*
 !data/secrets.txt
 .venv/
+.venv-ft/

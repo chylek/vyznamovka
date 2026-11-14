@@ -5,7 +5,9 @@ so the warm end of the list follows human association, not just co-occurrence.
 
 docs/d/<n>.bin  (n = 1-based day number since START):
   uint16[1001]  word indices: secret, then ranks 1..1000
-  uint8[V]      fastText cosine of every word to the secret, mapped (-0.2..1) -> 0..255
+  uint8[V]      cosine of every core word to the secret in the int8 PCA-128 space of
+                longtail.py, mapped (-0.2..1) -> 0..255 (ranks 1001+ and long-tail words)
+  int8[128]     the secret's PCA vector, so the browser can score long-tail guesses
 Jev answers are cached in data/jev/<secret>.json, so re-runs only ask about new words."""
 import json, os, sys, numpy as np
 sys.path.insert(0, "build"); from jev import noul
@@ -14,6 +16,10 @@ POOL, TOP, W_JEV = 1000, 1000, 0.6
 words = open("data/words.txt").read().split()
 ix = {w: i for i, w in enumerate(words)}
 e = np.load("data/ft.npy").astype(np.float32)
+pca = np.load("data/pca.npz")  # from longtail.py
+z = (e - pca["mu"]) @ pca["P"].T
+zq = np.clip(np.round(z / np.abs(z).max(1, keepdims=True) * 127), -127, 127)  # same int8 as the shards
+zn = zq / np.linalg.norm(zq, axis=1, keepdims=True)
 secrets = open("data/secrets.txt").read().split()
 only = sys.argv[1:]  # optional: just these secrets, print the result
 os.makedirs("docs/d", exist_ok=True); os.makedirs("data/jev", exist_ok=True)
@@ -42,8 +48,8 @@ for n, sec in enumerate(secrets, 1):
     if only:
         print(sec, ":", ", ".join(words[i] for i in top[:40]))
         continue
-    s[ix[sec]] = 1
-    q = np.clip((s + 0.2) / 1.2 * 255, 0, 255).round().astype(np.uint8)
+    c = zn @ zn[ix[sec]]
+    q = np.clip((c + 0.2) / 1.2 * 255, 0, 255).round().astype(np.uint8)
     with open(f"docs/d/{n}.bin", "wb") as f:
-        f.write(np.array([ix[sec], *top], dtype="<u2").tobytes() + q.tobytes())
+        f.write(np.array([ix[sec], *top], dtype="<u2").tobytes() + q.tobytes() + zq[ix[sec]].astype(np.int8).tobytes())
     print(n, sec, flush=True)

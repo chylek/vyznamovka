@@ -48,6 +48,8 @@
     <p>Hádej tajné slovo. Za každý tip se dozvíš jeho <b>pořadí</b>: 1 je slovo tajence významově nejbližší,
       2 druhé nejbližší… až po desítky tisíc. Pravopis nehraje roli, jen význam.</p>
     <p>Klidně piš slova v jakémkoli tvaru („psa“ se počítá jako „pes“). Tajenka je vždy v základním tvaru.</p>
+    <p>Hra zná přes půl milionu českých slov, i ta vzácná („ohyzdný“, „mžourat“). Tajenky, nápovědy
+      a seznam nejbližších ale berou jen z běžných ~32 tisíc slov.</p>
     <p>Pořadí 1000 nejbližších slov sestavil jazykový model, který posuzuje, co si lidé s tajenkou opravdu spojí;
       zbytek řadí vektory slov fastText. Nová tajenka každý den o půlnoci.</p>
   </details>
@@ -59,7 +61,7 @@ const day = +new URLSearchParams(location.search).get("d") ||
   Math.floor((Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - START) / 864e5) + 1;
 const key = "vyz-" + day;
 const $ = id => document.getElementById(id);
-let words, index, rankOf, byRank, forms, st = JSON.parse(localStorage.getItem(key) || '{"g":[]}');
+let words, index, rankOf, byRank, q, sv, st = JSON.parse(localStorage.getItem(key) || '{"g":[]}');
 
 async function load() {
   $("day").textContent = "#" + day;
@@ -68,7 +70,9 @@ async function load() {
     fetch(`d/${day}.bin`).then(r => r.ok ? r.arrayBuffer() : Promise.reject())]);
   words = w.trim().split("\n");
   index = new Map(words.map((x, i) => [x, i]));
-  const top = new Uint16Array(buf, 0, 1001), q = new Uint8Array(buf, 2002);
+  const top = new Uint16Array(buf, 0, 1001);
+  q = new Uint8Array(buf, 2002, words.length);  // core cosines to the secret
+  sv = new Int8Array(buf, 2002 + words.length, 128);  // secret vector for long-tail words
   const inTop = new Set(top);
   const rest = [...words.keys()].filter(i => !inTop.has(i)).sort((a, b) => q[b] - q[a]);
   byRank = [...top, ...rest];  // byRank[r] = word index, r=0 is the secret
@@ -78,17 +82,32 @@ async function load() {
   render();
 }
 
-async function lemma(x) {
-  if (index.has(x)) return x;
-  forms ??= await fetch("forms.json").then(r => r.json());
-  return forms[x] && index.has(forms[x]) ? forms[x] : null;
+// Every other word fastText knows lives in docs/w/<first 3 letters>.json:
+// {m: {form: lemma}, v: {lemma: base64 int8[128]}}, fetched only when typed.
+const shards = {};
+const shard = k => shards[k.slice(0, 3)] ??= fetch(`w/${encodeURIComponent(k.slice(0, 3))}.json`)
+  .then(r => r.ok ? r.json() : { m: {}, v: {} });
+
+// -> [lemma, rank] or null if unknown
+async function guess(x) {
+  if (index.has(x)) return [x, rankOf[index.get(x)]];
+  const l = (await shard(x)).m[x] ?? x;
+  if (index.has(l)) return [l, rankOf[index.get(l)]];
+  const b64 = (await shard(l)).v[l];
+  if (!b64) return null;
+  const v = Int8Array.from(atob(b64), c => c.charCodeAt(0) << 24 >> 24);
+  let d = 0, n1 = 0, n2 = 0;
+  for (let i = 0; i < 128; i++) { d += v[i] * sv[i]; n1 += v[i] * v[i]; n2 += sv[i] * sv[i]; }
+  const qv = Math.round(Math.min(255, Math.max(0, (d / Math.sqrt(n1 * n2) + 0.2) / 1.2 * 255)));
+  let r = 1;  // never 0: only the secret itself wins
+  for (let i = 0; i < q.length; i++) if (q[i] > qv && i !== byRank[0]) r++;
+  return [l, r];
 }
 
 const best = () => Math.min(...st.g.map(g => g.r), Infinity);
 const done = () => st.won || st.gaveUp;
 
-function add(w, extra = {}) {
-  const r = rankOf[index.get(w)];
+function add(w, r = rankOf[index.get(w)], extra = {}) {
   if (!st.g.some(g => g.w === w)) st.g.push({ w, r, ...extra });
   st.last = w;
   if (r === 0 && !done()) st.won = st.g.length;
@@ -133,11 +152,12 @@ $("f").onsubmit = async e => {
   e.preventDefault();
   const raw = $("g").value.trim().toLowerCase();
   if (!raw) return;
-  const w = await lemma(raw);
-  if (!w) return msg(`„${raw}“ neznám.`);
+  const res = await guess(raw);
+  if (!res) return msg(`„${raw}“ neznám.`);
+  const [w, r] = res;
   msg(w !== raw ? `${raw} → ${w}` : "");
   $("g").value = "";
-  add(w);
+  add(w, r);
 };
 
 $("hint").onclick = () => {
@@ -148,7 +168,7 @@ $("hint").onclick = () => {
   let w = words[byRank[r]], k = r;
   while (st.g.some(g => g.w === w) && k > 1) w = words[byRank[--k]];
   msg("");
-  add(w, { h: 1 });
+  add(w, undefined, { h: 1 });
 };
 
 $("giveup").onclick = () => {
