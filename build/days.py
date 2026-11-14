@@ -6,7 +6,7 @@ so the warm end of the list follows human association, not just co-occurrence.
 docs/d/<n>.bin  (n = 1-based day number since START):
   uint16[1001]  word indices: secret, then ranks 1..1000
   uint8[V]      fastText cosine of every word to the secret, mapped (-0.2..1) -> 0..255
-Jev answers are cached in data/jev/<secret>.json, so re-runs don't re-bill."""
+Jev answers are cached in data/jev/<secret>.json, so re-runs only ask about new words."""
 import json, os, sys, numpy as np
 sys.path.insert(0, "build"); from jev import noul
 
@@ -24,11 +24,11 @@ def rank(sec):
     s[ix[sec]] = -9
     pool = np.argsort(-s)[:POOL]
     cache = f"data/jev/{sec}.json"
-    if os.path.exists(cache):
-        p = json.load(open(cache))
-    else:
-        p = dict(zip((words[i] for i in pool), noul({"language": "Czech", "secret_word": sec},
-                     [f"Is „{words[i]}“ closely related in meaning to the secret word?" for i in pool])))
+    p = json.load(open(cache)) if os.path.exists(cache) else {}
+    todo = [words[i] for i in pool if words[i] not in p]  # only words not asked before (vocab changes)
+    if todo:
+        p.update(zip(todo, noul({"language": "Czech", "secret_word": sec},
+                                [f"Is „{w}“ closely related in meaning to the secret word?" for w in todo])))
         json.dump(p, open(cache, "w"), ensure_ascii=False)
     blend = [W_JEV * p[words[i]] + (1 - W_JEV) * (1 - r / POOL) for r, i in enumerate(pool)]
     top = pool[np.argsort(blend, kind="stable")[::-1]][:TOP]

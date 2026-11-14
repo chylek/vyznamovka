@@ -142,7 +142,9 @@ $("f").onsubmit = async e => {
 
 $("hint").onclick = () => {
   // half-way between the best guess and the secret, never the secret itself
-  const b = best(), r = b === Infinity ? 1000 : b > 10 ? Math.floor(b / 2) : Math.max(1, b - 1);
+  const b = best();
+  if (b === 1) return msg("Bližší nápověda už není – zbývá jen tajenka.");
+  const r = b === Infinity ? 1000 : b > 10 ? Math.floor(b / 2) : Math.max(1, b - 1);
   let w = words[byRank[r]], k = r;
   while (st.g.some(g => g.w === w) && k > 1) w = words[byRank[--k]];
   msg("");
