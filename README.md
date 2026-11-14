@@ -63,3 +63,10 @@ contains its secret and `data/secrets.txt` is the whole schedule. Fine for a
 friends-and-family game; hiding them would need a server.
 
 Play locally: `python -m http.server -d docs`, `?d=N` opens day N.
+
+## Licences
+
+Code: MIT (`LICENSE`). Data in `docs/` is derived from
+[fastText cc.cs.300](https://fasttext.cc/docs/en/crawl-vectors.html) (CC BY-SA 3.0),
+[wordfreq](https://github.com/rspeer/wordfreq) (CC BY-SA 4.0) and, in `docs/w/`, the
+[LibreOffice cs_CZ hunspell dictionary](https://github.com/LibreOffice/dictionaries/tree/master/cs_CZ) (GPL).

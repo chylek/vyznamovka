@@ -1,10 +1,8 @@
 """Tiny Jev (TypeSafe System One) client: batched yes/no probabilities."""
-import json, os, subprocess, time, urllib.request
+import json, os, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-KEY = os.environ.get("JEV_API_KEY") or subprocess.run(
-    [os.path.expanduser("~/claudecode/scripts/secrets.sh"), "JEV_API_KEY"],
-    capture_output=True, text=True).stdout.strip()
+KEY = os.environ["JEV_API_KEY"]
 
 
 def _call(state, questions):
