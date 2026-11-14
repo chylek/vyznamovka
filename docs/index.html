@@ -285,6 +285,16 @@ $("giveup").onclick = () => {
   add(words[byRank[0]]);
 };
 
+// Chrome "Desktop site" (on for all of chylek.eu on the owner's phone) ignores the viewport meta and
+// lays out at ~980px, so everything is tiny. Zoom back to the real screen width on touch phones.
+// ponytail: heuristic (touch + narrow screen + wide layout); tablets have screen.width >= 600 and are left alone
+function fitPhone() {
+  const z = innerWidth > 700 && screen.width < 600 && matchMedia("(pointer: coarse)").matches ? innerWidth / screen.width : 1;
+  document.documentElement.style.zoom = z === 1 ? "" : z;
+}
+fitPhone();
+addEventListener("resize", fitPhone);
+
 $("helpBtn").onclick = () => $("help").showModal();
 $("helpClose").onclick = () => $("help").close();
 $("help").onclick = e => e.target === $("help") && $("help").close();  // tap outside closes
