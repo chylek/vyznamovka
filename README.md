@@ -22,7 +22,7 @@ a raw cosine score.
   indices, then `uint8` fastText cosine for every word (ranks 1001+ are sorted in
   the browser). Day 1 = 2026-11-14, 365 days generated.
 
-Transformer embedding models (bge-m3, EmbeddingGemma) were tried for single words
+Transformer embedding models (bge-m3, EmbeddingGemma, Qwen3-Embedding-0.6B) were tried for single words
 and rank by spelling, not meaning (`pes` → pe, pec, ps), so they aren't used.
 
 ## Build
