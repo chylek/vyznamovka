@@ -1,1 +1,0 @@
-Download word2vec from https://github.com/dav/word2vec, compile it and place the binaries here.

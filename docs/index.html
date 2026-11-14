@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111">
+<link rel="icon" type="image/png" href="icon.png">
+<title>Významovka</title>
+<style>
+  :root { --bg: #fff; --fg: #111; --mute: #888; --line: #ddd; --acc: #7b2cbf; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111; --fg: #eee; --mute: #999; --line: #333; --acc: #e0aaff; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 32em; margin: 0 auto; padding: 1em; }
+  header { display: flex; align-items: baseline; gap: .5em; }
+  h1 { font-size: 1.4em; margin: 0; flex: 1; }
+  .mute { color: var(--mute); font-size: .9em; }
+  form { display: flex; gap: .4em; margin: 1em 0 .4em; }
+  input { flex: 1; font-size: 1.1em; padding: .5em .7em; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); min-width: 0; }
+  button { font-size: 1em; padding: .5em .8em; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  #msg { min-height: 1.4em; color: var(--acc); }
+  ol { list-style: none; padding: 0; margin: .5em 0; }
+  li { position: relative; display: flex; justify-content: space-between; padding: .45em .7em; margin: .25em 0; border-radius: 8px; overflow: hidden; }
+  li .bar { position: absolute; inset: 0 auto 0 0; z-index: -1; border-radius: 8px; }
+  li.last { outline: 2px solid var(--acc); }
+  .r0 .bar { background: #2b9348; } .r1 .bar { background: #e63946aa; } .r2 .bar { background: #f4a261aa; }
+  .r3 .bar { background: #e9c46a88; } .r4 .bar { background: #8ab6d666; }
+  #last { margin-bottom: 1em; }
+  #win { padding: 1em; border-radius: 8px; background: #2b934833; margin: 1em 0; }
+  details { margin-top: 2em; } summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Významovka</h1><span class="mute" id="day"></span></header>
+  <form id="f" autocomplete="off">
+    <input id="g" placeholder="napiš slovo…" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" disabled>
+    <button>Tip</button>
+  </form>
+  <div style="display:flex;gap:.4em"><button id="hint">Nápověda</button><button id="giveup">Vzdát</button>
+    <span class="mute" style="margin-left:auto;align-self:center" id="count"></span></div>
+  <div id="msg"></div>
+  <div id="win" hidden></div>
+  <ol id="last"></ol>
+  <ol id="list"></ol>
+  <details>
+    <summary>Jak se hraje</summary>
+    <p>Hádej tajné slovo. Za každý tip se dozvíš jeho <b>pořadí</b>: 1 je slovo tajence významově nejbližší,
+      2 druhé nejbližší… až po desítky tisíc. Pravopis nehraje roli, jen význam.</p>
+    <p>Klidně piš slova v jakémkoli tvaru („psa“ se počítá jako „pes“). Tajenka je vždy v základním tvaru.</p>
+    <p>Pořadí 1000 nejbližších slov sestavil jazykový model, který posuzuje, co si lidé s tajenkou opravdu spojí;
+      zbytek řadí vektory slov fastText. Nová tajenka každý den o půlnoci.</p>
+  </details>
+</main>
+<script>
+const START = Date.UTC(2026, 10, 14);  // day 1
+const today = new Date();
+const day = +new URLSearchParams(location.search).get("d") ||
+  Math.floor((Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) - START) / 864e5) + 1;
+const key = "vyz-" + day;
+const $ = id => document.getElementById(id);
+let words, index, rankOf, byRank, forms, st = JSON.parse(localStorage.getItem(key) || '{"g":[]}');
+
+async function load() {
+  $("day").textContent = "#" + day;
+  const [w, buf] = await Promise.all([
+    fetch("words.txt").then(r => r.text()),
+    fetch(`d/${day}.bin`).then(r => r.ok ? r.arrayBuffer() : Promise.reject())]);
+  words = w.trim().split("\n");
+  index = new Map(words.map((x, i) => [x, i]));
+  const top = new Uint16Array(buf, 0, 1001), q = new Uint8Array(buf, 2002);
+  const inTop = new Set(top);
+  const rest = [...words.keys()].filter(i => !inTop.has(i)).sort((a, b) => q[b] - q[a]);
+  byRank = [...top, ...rest];  // byRank[r] = word index, r=0 is the secret
+  rankOf = new Int32Array(words.length);
+  byRank.forEach((wi, r) => rankOf[wi] = r);
+  $("g").disabled = false; $("g").focus();
+  render();
+}
+
+async function lemma(x) {
+  if (index.has(x)) return x;
+  forms ??= await fetch("forms.json").then(r => r.json());
+  return forms[x] && index.has(forms[x]) ? forms[x] : null;
+}
+
+const best = () => Math.min(...st.g.map(g => g.r), Infinity);
+const done = () => st.won || st.gaveUp;
+
+function add(w, extra = {}) {
+  const r = rankOf[index.get(w)];
+  if (!st.g.some(g => g.w === w)) st.g.push({ w, r, ...extra });
+  st.last = w;
+  if (r === 0 && !done()) st.won = st.g.length;
+  localStorage.setItem(key, JSON.stringify(st));
+  render();
+}
+
+function li(g) {
+  const r = g.r, cls = r === 0 ? "r0" : r <= 10 ? "r1" : r <= 100 ? "r2" : r <= 1000 ? "r3" : "r4";
+  const pct = r === 0 ? 100 : Math.max(3, 100 * (1 - Math.log(r) / Math.log(words.length)));
+  const e = document.createElement("li");
+  e.className = cls + (g.w === st.last ? " last" : "");
+  e.innerHTML = `<span class="bar" style="width:${pct}%"></span><span></span><span>${r === 0 ? "🎯" : r}${g.h ? " 💡" : ""}</span>`;
+  e.children[1].textContent = g.w;
+  return e;
+}
+
+function render() {
+  const last = st.g.find(g => g.w === st.last);
+  $("last").replaceChildren(...(last ? [li(last)] : []));
+  $("list").replaceChildren(...[...st.g].sort((a, b) => a.r - b.r).map(li));
+  $("count").textContent = st.g.length ? `${st.g.length} tipů` : "";
+  $("hint").disabled = $("giveup").disabled = done();
+  if (done()) {
+    const secret = words[byRank[0]];
+    $("win").hidden = false;
+    $("win").innerHTML = (st.won ? `<b>Uhodnuto na ${st.won}. pokus!</b>` : `Tajenka byla <b></b>.`) +
+      `<br><button id="share">Sdílet</button> <button id="near">100 nejbližších</button><p id="nearl" class="mute" hidden></p>`;
+    if (!st.won) $("win").querySelector("b").textContent = secret;
+    $("near").onclick = () => { $("nearl").hidden = false; $("nearl").textContent = byRank.slice(1, 101).map(i => words[i]).join(", "); };
+    $("share").onclick = () => {
+      const t = `Významovka #${day}: ${st.won ? `uhodnuto na ${st.won}. pokus` : "vzdáno"}` +
+        `${st.g.some(g => g.h) ? ` (nápověd: ${st.g.filter(g => g.h).length})` : ""}\n${location.origin + location.pathname}`;
+      navigator.share ? navigator.share({ text: t }).catch(() => {}) : navigator.clipboard.writeText(t).then(() => msg("Zkopírováno."));
+    };
+  }
+}
+
+const msg = t => $("msg").textContent = t;
+
+$("f").onsubmit = async e => {
+  e.preventDefault();
+  const raw = $("g").value.trim().toLowerCase();
+  if (!raw) return;
+  const w = await lemma(raw);
+  if (!w) return msg(`„${raw}“ neznám.`);
+  msg(w !== raw ? `${raw} → ${w}` : "");
+  $("g").value = "";
+  add(w);
+};
+
+$("hint").onclick = () => {
+  // half-way between the best guess and the secret, never the secret itself
+  const b = best(), r = b === Infinity ? 1000 : b > 10 ? Math.floor(b / 2) : Math.max(1, b - 1);
+  let w = words[byRank[r]], k = r;
+  while (st.g.some(g => g.w === w) && k > 1) w = words[byRank[--k]];
+  msg("");
+  add(w, { h: 1 });
+};
+
+$("giveup").onclick = () => {
+  if (!confirm("Opravdu se vzdát?")) return;
+  st.gaveUp = 1;
+  add(words[byRank[0]]);
+};
+
+load().catch(() => msg("Pro tento den tajenka není."));
+</script>
+</body>
+</html>
